@@ -13,9 +13,7 @@
     // تهيئة Supabase Client
     const supabase = window.supabase.createClient(
       "https://bixlzoyhaotjegzlwpvn.supabase.co", // رابط مشروعك
-      "public-anon-key" // ضع المفتاح العام هنا من Supabase Settings
-    );
-
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpeGx6b3loYW90amVnemx3cHZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0NDkxOTEsImV4cCI6MjEwMDAyNTE5MX0.biIwYArP0LV5gey5DqocXHFZCGQG_16fDvrWUDuDVIk" //
     async function loadPages() {
       const { data, error } = await supabase
         .from("page_visibility")
