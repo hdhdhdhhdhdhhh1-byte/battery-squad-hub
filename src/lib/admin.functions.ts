@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const OWNER_EMAIL = "Shafiqalwatiry@gmail.com";
+const OWNER_EMAIL = "shafiqalwatiry@gmail.com"; // تصحيح: أحرف صغيرة
 
 /**
  * Idempotent: ensures the owner account exists with the configured password.
@@ -46,15 +46,19 @@ export const ensureOwner = createServerFn({ method: "POST" }).handler(async () =
   return { ok: true, email: OWNER_EMAIL };
 });
 
-async function assertAdmin(userId: string) {
+/**
+ * ✅ تعديل جديد: التحقق من أن المستخدم هو المالك فقط
+ * (بدلاً من assertAdmin الذي كان يسمح لأي admin)
+ */
+async function assertOwner(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
-    .in("role", ["owner", "admin"]);
+    .eq("role", "owner");
   if (error) throw new Error(error.message);
-  if (!data || data.length === 0) throw new Error("Forbidden");
+  if (!data || data.length === 0) throw new Error("فقط المالك يمكنه إنشاء الحسابات وتعديل الصلاحيات");
 }
 
 const PermSchema = z.object({
@@ -81,11 +85,14 @@ const CreateUserInput = z.object({
   permissions: z.array(PermSchema),
 });
 
+/**
+ * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
+ */
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateUserInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -105,10 +112,13 @@ export const createUser = createServerFn({ method: "POST" })
     return { ok: true, user_id: uid };
   });
 
+/**
+ * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
+ */
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
+    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role");
@@ -132,11 +142,14 @@ const UpdatePermsInput = z.object({
   permissions: z.array(PermSchema),
 });
 
+/**
+ * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
+ */
 export const updateUserPermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => UpdatePermsInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.role) {
@@ -162,11 +175,14 @@ const ResetPasswordInput = z.object({
   password: z.string().min(6),
 });
 
+/**
+ * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
+ */
 export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => ResetPasswordInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
       password: data.password,
@@ -177,11 +193,14 @@ export const resetUserPassword = createServerFn({ method: "POST" })
 
 const DeleteUserInput = z.object({ user_id: z.string().uuid() });
 
+/**
+ * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
+ */
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => DeleteUserInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
+    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Prevent deleting owner
     const { data: roles } = await supabaseAdmin
