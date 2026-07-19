@@ -50,10 +50,12 @@ function defaultPerms(): Perm[] {
   }));
 }
 
+// ✅ تعديل: السماح فقط بالأدوار غير owner
 const SELECTABLE_ROLES = APP_ROLES.filter((r) => r.key !== "owner");
 
 function UsersPage() {
-  const { isAdmin, loading } = useAuth();
+  // ✅ تعديل: إضافة role من useAuth
+  const { isAdmin, loading, role } = useAuth();
   const qc = useQueryClient();
   const listFn = useServerFn(listUsers);
   const createFn = useServerFn(createUser);
@@ -110,14 +112,18 @@ function UsersPage() {
   });
 
   if (loading) return <div>...</div>;
-  if (!isAdmin) throw redirect({ to: "/dashboard" });
+  
+  // ✅ تعديل: التحقق من أن المستخدم هو المالك فقط
+  if (!loading && role !== "owner") {
+    throw redirect({ to: "/dashboard" });
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2"><Shield className="h-6 w-6" /> إدارة المستخدمين</h1>
-          <p className="text-muted-foreground text-sm mt-1">إنشاء وإدارة الحسابات والصلاحيات التفصيلية</p>
+          <p className="text-muted-foreground text-sm mt-1">إنشاء وإدارة الحسابات والصلاحيات التفصيلية (متاح للمالك فقط)</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 ml-1" /> مستخدم جديد</Button></DialogTrigger>
@@ -193,124 +199,4 @@ function UsersPage() {
           <EditUserDialog
             user={editingUser}
             onSave={(role, formation, perms) => updateMut.mutate({ user_id: editingUser.id, role, assigned_formation: formation, permissions: perms })}
-            saving={updateMut.isPending}
-          />
-        )}
-      </Dialog>
-
-      <Dialog open={!!resettingUser} onOpenChange={(v) => !v && setResettingUser(null)}>
-        {resettingUser && (
-          <DialogContent>
-            <DialogHeader><DialogTitle>تغيير كلمة المرور</DialogTitle></DialogHeader>
-            <div className="grid gap-3">
-              <div><Label>{resettingUser.email}</Label></div>
-              <Input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="كلمة المرور الجديدة" />
-            </div>
-            <DialogFooter>
-              <Button disabled={newPassword.length < 6 || resetMut.isPending}
-                onClick={() => resetMut.mutate({ user_id: resettingUser.id, password: newPassword })}>حفظ</Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
-    </div>
-  );
-}
-
-type UserRow = {
-  id: string;
-  email: string | undefined;
-  full_name: string | null;
-  created_at: string;
-  roles: string[];
-  assigned_formation: string | null;
-  permissions: Perm[];
-};
-
-function EditUserDialog({
-  user, onSave, saving,
-}: { user: UserRow; onSave: (role: RoleKey, formation: string | null, perms: Perm[]) => void; saving: boolean }) {
-  const initRole = (user.roles.find((r) => SELECTABLE_ROLES.some((x) => x.key === r)) as RoleKey) ?? "viewer";
-  const [role, setRole] = useState<RoleKey>(initRole);
-  const [formation, setFormation] = useState<string | null>(user.assigned_formation);
-  const [perms, setPerms] = useState<Perm[]>(() => {
-    const map = new Map(user.permissions.map((p) => [p.module, p]));
-    return APP_MODULES.map((m) => {
-      const existing = map.get(m.key);
-      return existing ?? {
-        module: m.key, can_view: true, can_edit: false, can_approve: false,
-        can_add: false, can_delete: false, can_print: false, can_export_pdf: false, can_export_image: false,
-        can_cancel_approval: false,
-      };
-    });
-  });
-  return (
-    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-      <DialogHeader><DialogTitle>تعديل الصلاحيات — {user.full_name}</DialogTitle></DialogHeader>
-      <div className="grid gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>الدور</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as RoleKey)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SELECTABLE_ROLES.map((r) => <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>التشكيل المسند</Label>
-            <Select value={formation ?? "none"} onValueChange={(v) => setFormation(v === "none" ? null : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— لا يوجد —</SelectItem>
-                {FORMATIONS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <PermissionsGrid permissions={perms} onChange={setPerms} />
-      </div>
-      <DialogFooter><Button disabled={saving} onClick={() => onSave(role, formation, perms)}>حفظ</Button></DialogFooter>
-    </DialogContent>
-  );
-}
-
-function PermissionsGrid({ permissions, onChange }: { permissions: Perm[]; onChange: (p: Perm[]) => void }) {
-  const update = (module: string, key: keyof Perm, value: boolean) => {
-    onChange(permissions.map((p) => (p.module === module ? { ...p, [key]: value } : p)));
-  };
-  return (
-    <div>
-      <Label className="mb-2 block">الصلاحيات التفصيلية</Label>
-      <div className="border rounded-md overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>القسم</TableHead>
-              {PERM_COLS.map((c) => <TableHead key={c.key} className="text-center">{c.label}</TableHead>)}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {permissions.map((p) => {
-              const label = APP_MODULES.find((m) => m.key === p.module)?.label ?? p.module;
-              return (
-                <TableRow key={p.module}>
-                  <TableCell className="font-medium">{label}</TableCell>
-                  {PERM_COLS.map((c) => (
-                    <TableCell key={c.key} className="text-center">
-                      <Checkbox
-                        checked={p[c.key] as boolean}
-                        onCheckedChange={(v) => update(p.module, c.key, !!v)}
-                      />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-}
+     
