@@ -194,9 +194,18 @@ function UsersPage() {
         </Table>
       </CardContent></Card>
 
-      <Dialog open={!!editingUser} onOpenChange={(v) => !v && setEditingUser(null)}>
-        {editingUser && (
-          <EditUserDialog
-            user={editingUser}
-            onSave={(role, formation, perms) => updateMut.mutate({ user_id: editingUser.id, role, assigned_formation: formation, permissions: perms })}
-     
+    <Dialog open={!!editingUser} onOpenChange={(v) => !v && setEditingUser(null)}>
+  {editingUser && (
+    <EditUserDialog
+      user={editingUser}
+      onSave={({ role, formation, perms }) =>
+        updateMut.mutate({
+          user_id: editingUser.id,
+          role,
+          assigned_formation: formation,
+          permissions: perms,
+        })
+      }
+    />
+  )}
+</Dialog>
