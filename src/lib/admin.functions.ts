@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const OWNER_EMAIL = "shafiqalwatiry@gmail.com"; // تصحيح: أحرف صغيرة
+const OWNER_EMAIL = "shafiqalwatiry@gmail.com"; // البريد الأساسي للمالك
 
 /**
  * Idempotent: ensures the owner account exists with the configured password.
@@ -47,11 +47,17 @@ export const ensureOwner = createServerFn({ method: "POST" }).handler(async () =
 });
 
 /**
- * ✅ تعديل جديد: التحقق من أن المستخدم هو المالك فقط
- * (بدلاً من assertAdmin الذي كان يسمح لأي admin)
+ * ✅ تعديل مباشر: التحقق من أن المستخدم الحالي هو المالك عبر بريدك الأساسي
  */
 async function assertOwner(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  
+  // استثناء وتجاوز مباشر لبريدك الأساسي لضمان صلاحية المالك دائماً
+  const { data: userAuth } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (userAuth?.user?.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+    return;
+  }
+
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
@@ -85,14 +91,11 @@ const CreateUserInput = z.object({
   permissions: z.array(PermSchema),
 });
 
-/**
- * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
- */
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateUserInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
+    await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -112,13 +115,10 @@ export const createUser = createServerFn({ method: "POST" })
     return { ok: true, user_id: uid };
   });
 
-/**
- * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
- */
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
+    await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role");
@@ -142,14 +142,11 @@ const UpdatePermsInput = z.object({
   permissions: z.array(PermSchema),
 });
 
-/**
- * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
- */
 export const updateUserPermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => UpdatePermsInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
+    await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.role) {
@@ -175,14 +172,11 @@ const ResetPasswordInput = z.object({
   password: z.string().min(6),
 });
 
-/**
- * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
- */
 export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => ResetPasswordInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
+    await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
       password: data.password,
@@ -193,14 +187,11 @@ export const resetUserPassword = createServerFn({ method: "POST" })
 
 const DeleteUserInput = z.object({ user_id: z.string().uuid() });
 
-/**
- * ✅ تعديل: استخدام assertOwner بدلاً من assertAdmin
- */
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => DeleteUserInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertOwner(context.userId); // ✅ تعديل: فقط المالك
+    await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Prevent deleting owner
     const { data: roles } = await supabaseAdmin
@@ -214,3 +205,4 @@ export const deleteUser = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
