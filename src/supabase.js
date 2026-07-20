@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js' 
 
-const supabaseUrl = 'https://bixlzoyhaotjegzlwpvn.supabase.co' 
+const supabaseUrl =imort.mate.env.VITE_SUPABASE_KUL
 
-const supabaseKey = process.env.SUPABASE_KEY​​​​
+const supabaseKey = import.mate.env.VITE_SUPABASE_KEY​​​​
 
 const supabase = createClient ( supabaseUrl , supabaseKey ) 
 
-
+export default supabase
