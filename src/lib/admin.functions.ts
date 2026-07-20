@@ -93,7 +93,7 @@ const CreateUserInput = z.object({
 
 export const createUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => CreateUserInput.parse(input))
+  .validator((input) => CreateUserInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -144,7 +144,7 @@ const UpdatePermsInput = z.object({
 
 export const updateUserPermissions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => UpdatePermsInput.parse(input))
+  .validator((input) => UpdatePermsInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -174,7 +174,7 @@ const ResetPasswordInput = z.object({
 
 export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => ResetPasswordInput.parse(input))
+  .validator((input) => ResetPasswordInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -189,7 +189,7 @@ const DeleteUserInput = z.object({ user_id: z.string().uuid() });
 
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => DeleteUserInput.parse(input))
+  .validator((input) => DeleteUserInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertOwner(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
